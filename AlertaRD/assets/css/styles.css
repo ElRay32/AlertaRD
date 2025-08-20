@@ -1,0 +1,5 @@
+:root { --brand: #1f6feb; }
+.leaflet-container { height: 70vh; }
+.badge-type { margin-right: 0.25rem; }
+.table thead th { white-space: nowrap; }
+.modal-lg { max-width: 900px; }
