@@ -6,6 +6,27 @@ $displayName = $_SESSION['name'] ?? 'Invitado';
 <!doctype html>
 <html lang="es">
 <head>
+
+<meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+<script>
+// Helpers fetch básicos (si ya tienes apiGet/apiPost, actualízalos con el header)
+window.CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+async function apiGet(url){
+  const res = await fetch(url, {credentials:'same-origin'});
+  return await res.json();
+}
+async function apiPost(url, data){ // data: FormData o objeto
+  let body, headers = {'X-CSRF-Token': window.CSRF_TOKEN};
+  if (data instanceof FormData) { body = data; }
+  else if (data instanceof URLSearchParams) { body = data; }
+  else { headers['Content-Type']='application/json'; body = JSON.stringify(data); }
+  const res = await fetch(url, {method:'POST', body, headers, credentials:'same-origin'});
+  return await res.json();
+}
+</script>
+
+
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AlertarRD</title>

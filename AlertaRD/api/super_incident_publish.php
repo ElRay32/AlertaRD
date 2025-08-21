@@ -1,6 +1,9 @@
 <?php
 require __DIR__.'/db.php';
 require __DIR__.'/helpers.php';
+require __DIR__.'/../auth/email_lib.php';
+require_csrf();
+
 require_role(['validator','admin']);
 
 $data = $_POST + body_json();
@@ -23,6 +26,11 @@ try {
   $upd->execute([$user_id, $id]);
 
   $pdo->commit();
+
+// Notificar al reportero
+@notify_incident_status($id, 'published', null);
+
+
   json_out(['ok'=>true]);
 } catch (Throwable $e) {
   $pdo->rollBack();

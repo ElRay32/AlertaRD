@@ -1,6 +1,8 @@
 <?php
 require __DIR__.'/db.php';
 require __DIR__.'/helpers.php';
+require_csrf();
+
 require_role(['validator','admin']);
 
 function detect_delimiter($line) {

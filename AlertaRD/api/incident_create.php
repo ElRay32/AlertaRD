@@ -1,6 +1,7 @@
 <?php
 require __DIR__.'/db.php';
 require __DIR__.'/helpers.php';
+require_csrf();
 require_role(['reporter','validator','admin']); // solo usuarios logueados
 
 // Sanitiza helpers
