@@ -26,3 +26,8 @@
   box-shadow: 0 0 0 1px rgba(0,0,0,.2);
   margin-right: .5rem;
 }
+
+/* Leyenda: ícono + nombre */
+.map-legend .item { display:flex; align-items:center; margin-bottom:.25rem; }
+.map-legend .legend-icon { width:20px; height:20px; display:inline-block; margin-right:.5rem; }
+#heatTuning input[type="range"] { vertical-align: middle; }

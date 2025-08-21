@@ -4,6 +4,7 @@
   <a class="btn btn-outline-primary" href="/alertard/super/catalogs.php">Administrar Catálogos</a>
   <a class="btn btn-outline-secondary" href="/alertard/super/stats.php">Ver estadísticas</a>
   <a class="btn btn-outline-dark" href="/alertard/super/import.php">Importar CSV</a>
+  <a class="btn btn-success" href="/alertard/super/export.php">Exportar CSV</a>
 </div>
 <?php if (($role ?? 'guest')!=='validator' && ($role ?? 'guest')!=='admin'): ?>
 <div class="alert alert-danger">Acceso restringido. Inicia sesión como validador.</div>
