@@ -29,8 +29,8 @@ $displayName = $_SESSION['name'] ?? 'Invitado';
       </ul>
       <div class="d-flex">
         <?php if ($role === 'guest'): ?>
-          <a class="btn btn-outline-primary me-2" href="/alertard/super/login.php">Entrar</a>
-        <?php else: ?>
+  <a class="btn btn-outline-primary me-2" href="/alertard/auth/login.php">Entrar</a>
+<?php else: ?>
           <span class="me-3 small text-muted">Sesión: <strong><?php echo htmlspecialchars($displayName) ?></strong> (<?php echo htmlspecialchars($role) ?>)</span>
           <a class="btn btn-outline-danger" href="/alertard/auth/logout.php">Salir</a>
         <?php endif; ?>

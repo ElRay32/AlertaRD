@@ -4,14 +4,18 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <h5 class="card-title mb-3">Entrar como Reportero</h5>
-        <p class="text-muted small">Usa tu cuenta corporativa o personal. Tu rol será <strong>reporter</strong>; tus reportes deberán ser validados antes de publicarse.</p>
-        <div class="d-grid gap-2">
-          <a class="btn btn-danger" href="/alertard/auth/google_start.php">Continuar con Google</a>
-          <a class="btn btn-primary" href="/alertard/auth/ms_start.php">Continuar con Microsoft</a>
-        </div>
+        <form method="post" action="/alertard/auth/email_start.php" class="row g-2">
+          <div class="col-12">
+            <input type="email" class="form-control" name="email" placeholder="Tu correo (Gmail u Outlook)" required>
+            <div class="form-text">Sólo se aceptan dominios de Google/Microsoft (gmail.com, outlook.com, etc.).</div>
+          </div>
+          <div class="col-12 d-grid">
+            <button class="btn btn-primary" type="submit">Enviar código</button>
+          </div>
+        </form>
         <hr>
         <p class="small text-muted mb-1">¿Eres Validador/Admin?</p>
-        <a class="btn btn-outline-secondary btn-sm" href="/alertard/super/login.php">Entrar a /super (demo)</a>
+        <a class="btn btn-outline-secondary btn-sm" href="/alertard/super/login.php">Entrar a /super</a>
       </div>
     </div>
   </div>
