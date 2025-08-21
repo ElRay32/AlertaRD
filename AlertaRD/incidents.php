@@ -1,4 +1,4 @@
-<?php require __DIR__.'/partials/header.php'; ?>
+<?php $title='Incidencias'; require __DIR__.'/partials/header.php'; ?>
 <h4 class="mb-3">Incidencias</h4>
 
 <form id="filters" class="row g-2 mb-3">

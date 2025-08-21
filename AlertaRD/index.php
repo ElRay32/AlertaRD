@@ -1,4 +1,4 @@
-<?php require __DIR__.'/partials/header.php'; ?>
+<?php $title='Inicio / Mapa'; require __DIR__.'/partials/header.php'; ?>
 <h4 class="mb-3">Incidencias</h4>
 <form class="row g-2 mb-3" id="filters">
   <div class="col-sm-3"><input class="form-control" name="q" placeholder="Buscar por título o descripción"></div>

@@ -1,4 +1,4 @@
-<?php require __DIR__.'/../partials/header.php'; ?>
+<?php $title='Pendientes de validación'; require __DIR__.'/../partials/header.php'; ?>
 <?php if (($role ?? 'guest')!=='validator' && ($role ?? 'guest')!=='admin'): ?>
 <div class="alert alert-danger">Acceso restringido. Inicia sesión como validador.</div>
 <?php require __DIR__.'/../partials/footer.php'; exit; endif; ?>

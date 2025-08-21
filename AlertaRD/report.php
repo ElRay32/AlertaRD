@@ -1,4 +1,4 @@
-<?php require __DIR__.'/partials/header.php'; ?>
+<?php $title='Reportar incidencia'; require __DIR__.'/partials/header.php'; ?>
 <?php if (!in_array(($role ?? 'guest'), ['reporter','validator','admin'])): ?>
 <div class="alert alert-warning">Debes iniciar sesión para reportar.</div>
 <?php require __DIR__.'/partials/footer.php'; exit; endif; ?>
