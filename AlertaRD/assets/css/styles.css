@@ -3,3 +3,26 @@
 .badge-type { margin-right: 0.25rem; }
 .table thead th { white-space: nowrap; }
 .modal-lg { max-width: 900px; }
+
+/* Pins por tipo (Leaflet DivIcon) */
+.pin-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0,0,0,.45);
+}
+.leaflet-container { height: 70vh; }
+
+/* Leyenda del mapa */
+.map-legend {
+  background: #fff;
+  padding: .5rem .75rem;
+  border-radius: .5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,.1);
+  font-size: .9rem;
+}
+.map-legend .item { display: flex; align-items: center; margin-bottom: .25rem; }
+.map-legend .swatch {
+  width: 12px; height: 12px; border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.2);
+  margin-right: .5rem;
+}
