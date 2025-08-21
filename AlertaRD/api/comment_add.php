@@ -6,7 +6,12 @@ require_csrf();
 require_role(['reporter','validator','admin']);
 $data = $_POST + body_json();
 $incident_id = (int)($data['incident_id'] ?? 0);
-$content = trim($data['content'] ?? '');
+
+$content = trim($_POST['content'] ?? (body_json()['content'] ?? ''));
+$content = strip_tags($content);
+if (mb_strlen($content) > 1000) $content = mb_substr($content, 0, 1000);
+if ($content === '') json_out(['error'=>'empty'], 422);
+
 $user_id = $_SESSION['user_id'] ?? null;
 
 if (!$incident_id || $content==='') json_out(['error'=>'missing data'], 400);

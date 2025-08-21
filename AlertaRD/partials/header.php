@@ -3,6 +3,15 @@ if (session_status() === PHP_SESSION_NONE) { session_start(); }
 $role = $_SESSION['role'] ?? 'guest';
 $displayName = $_SESSION['name'] ?? 'Invitado';
 ?>
+
+<?php
+// Cabeceras seguras mínimas
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+?>
+
+
 <!doctype html>
 <html lang="es">
 <head>

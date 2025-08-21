@@ -10,6 +10,8 @@
             <div class="form-text">Sólo se aceptan dominios de Google/Microsoft (gmail.com, outlook.com, etc.).</div>
           </div>
           <div class="col-12 d-grid">
+            <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+            <input type="email" name="email" class="form-control" required>
             <button class="btn btn-primary" type="submit">Enviar código</button>
           </div>
         </form>

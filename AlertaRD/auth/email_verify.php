@@ -1,35 +1,45 @@
 <?php
+require __DIR__.'/../api/db.php';
 require __DIR__.'/email_lib.php';
+require __DIR__.'/../api/helpers.php';
+require_csrf();
 
-$email = $_SESSION['otp_email'] ?? null;
-if (!$email) { header('Location: /alertard/auth/login.php'); exit; }
+// === BLOQUE DE VERIFICACIÓN OTP (REEMPLAZA TU LÓGICA ACTUAL) ===
+$email = trim($_POST['email'] ?? (body_json()['email'] ?? ''));
+$code  = trim($_POST['code']  ?? (body_json()['code']  ?? ''));
 
-$cfg = ecfg();
-$msg = '';
+if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $code==='') {
+  echo json_encode(['ok'=>false,'error'=>'bad_request']); exit;
+}
 
-if ($_SERVER['REQUEST_METHOD']==='POST') {
-  $code = trim($_POST['code'] ?? '');
-  if (!preg_match('/^\d{6}$/', $code)) {
-    $msg = 'Código inválido.';
-  } else {
-    $pdo = dbx();
-    $sel = $pdo->prepare("SELECT id, expires_at, used FROM login_tokens
-                          WHERE email=? AND code=? ORDER BY id DESC LIMIT 1");
-    $sel->execute([$email, $code]);
-    $t = $sel->fetch();
+// Trae el token más reciente NO usado y NO vencido
+$sql = "SELECT * FROM login_tokens
+        WHERE email=? AND used=0 AND expires_at > NOW()
+        ORDER BY created_at DESC LIMIT 1";
+$st = dbx()->prepare($sql);
+$st->execute([$email]);
+$tok = $st->fetch();
 
-    if (!$t) {
-      $msg = 'Código incorrecto.';
-    } elseif ((int)$t['used']===1) {
-      $msg = 'Código ya usado.';
-    } elseif (strtotime($t['expires_at']) < time()) {
-      $msg = 'Código expirado.';
-    } else {
-      // marca usado
-      $upd = $pdo->prepare("UPDATE login_tokens SET used=1 WHERE id=?");
-      $upd->execute([$t['id']]);
+if (!$tok) {
+  echo json_encode(['ok'=>false,'error'=>'invalid_or_expired']); exit;
+}
 
-      // crea/actualiza usuario reporter
+// Demasiados intentos con este token
+if (otp_blocked($tok)) {
+  echo json_encode(['ok'=>false,'error'=>'too_many_attempts']); exit;
+}
+
+// Compara el código (texto plano; si lo guardas hasheado, adapta esta línea)
+if (!hash_equals($tok['code'], $code)) {
+  otp_register_attempt($tok['id']); // suma intento y marca hora
+  echo json_encode(['ok'=>false,'error'=>'wrong_code','attempts'=>((int)$tok['verify_attempts']+1)]); exit;
+}
+
+// Éxito: marca token usado
+dbx()->prepare("UPDATE login_tokens SET used=1, last_attempt_at=NOW() WHERE id=?")->execute([$tok['id']]);
+
+
+// crea/actualiza usuario reporter
       $user_id = upsert_reporter_email($email);
 
       // inicia sesión
@@ -42,9 +52,12 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 
       header('Location: /alertard/index.php');
       exit;
-    }
-  }
-}
+
+echo json_encode(['ok'=>true]);
+
+
+      
+    
 ?>
 <?php require __DIR__.'/../partials/header.php'; ?>
 <div class="row justify-content-center">
@@ -66,11 +79,14 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
           <div class="alert alert-danger"><?php echo htmlspecialchars($msg); ?></div>
         <?php endif; ?>
 
-        <form method="post" class="row g-2">
+        <form action="/alertard/auth/email_verify.php" method="POST" id="form-verify">
           <div class="col-12">
             <input type="text" class="form-control" name="code" placeholder="Código de 6 dígitos" maxlength="6" required>
           </div>
           <div class="col-12 d-grid">
+              <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+              <input type="email" name="email" class="form-control" required>
+              <input type="text"  name="code"  class="form-control" maxlength="6" required>
             <button class="btn btn-success" type="submit">Entrar</button>
           </div>
         </form>

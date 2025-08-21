@@ -11,6 +11,14 @@ if (!is_allowed_domain($email)) {
   die('Dominio no permitido. Usa un correo de Gmail/Outlook/Hotmail/Live.');
 }
 
+$ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+if (otp_is_rate_limited($email, $ip)) {
+  http_response_code(429);
+  echo json_encode(['ok'=>false, 'error'=>'rate_limited']); // demasiadas solicitudes
+  exit;
+}
+
+
 $pdo = dbx();
 
 // Rate limit simple: 1 minuto entre envíos
@@ -29,10 +37,13 @@ if ($last && (time() - strtotime($last) < $cfg['resend_wait_minutes']*60)) {
 }
 
 if (empty($code)) {
-  $code = gen_code();
-  $ins = $pdo->prepare("INSERT INTO login_tokens(email, code, provider, created_at, expires_at, used)
-                        VALUES (?,?,?,?,?,0)");
-  $ins->execute([$email, $code, provider_from_email($email), now_mysql(), plus_minutes($cfg['code_ttl_minutes'])]);
+  $code = str_pad((string)random_int(0,999999), 6, '0', STR_PAD_LEFT);
+
+$ins = $pdo->prepare("INSERT INTO login_tokens
+  (email, ip_address, code, provider, created_at, expires_at, verify_attempts)
+  VALUES (?,?,?,?,NOW(), DATE_ADD(NOW(), INTERVAL 10 MINUTE), 0)");
+$ins->execute([$email, $ip, $provider, $code]); // ojo: orden igual que en el INSERT
+
 }
 
 // Enviar email (si está configurado; si no, modo debug mostrará el código)
