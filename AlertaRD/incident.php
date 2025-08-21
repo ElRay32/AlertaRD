@@ -4,6 +4,9 @@ $id = (int)($_GET['id'] ?? 0);
 ?>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css">
+<script src="https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js"></script>
+
 
 <div id="content" class="d-none">
   <nav aria-label="breadcrumb">
@@ -19,6 +22,11 @@ $id = (int)($_GET['id'] ?? 0);
   <div class="row g-3">
     <div class="col-md-8">
       <div id="map" style="height: 380px" class="rounded border mb-3"></div>
+      <?php if (in_array(($role ?? 'guest'), ['validator','admin'])): ?>
+  <div class="mb-3">
+    <button class="btn btn-sm btn-outline-primary" id="btnEditLoc">Editar ubicación</button>
+  </div>
+<?php endif; ?>
       <div id="desc" class="mb-3"></div>
       <div id="links" class="mb-3"></div>
       <div id="photos" class="mb-3"></div>
@@ -86,9 +94,12 @@ if (!ID) { document.body.innerHTML = '<div class="container py-4"><div class="al
 async function loadDetail(){
   const data = await apiGet('/alertard/api/incident_detail.php?id=' + ID);
   const i = data.incident;
-  if (!i || i.status!=='published') {
-    document.body.innerHTML = '<div class="container py-4"><div class="alert alert-warning">Incidencia no disponible.</div></div>'; return;
+
+  if (!i || i.status !== 'published') {
+    document.body.innerHTML = '<div class="container py-4"><div class="alert alert-warning">Incidencia no disponible.</div></div>';
+    return;
   }
+
   // Título y meta
   document.getElementById('crumbTitle').textContent = i.title || `#${i.id}`;
   document.getElementById('title').textContent = i.title || `#${i.id}`;
@@ -97,14 +108,26 @@ async function loadDetail(){
     <span class="text-muted">${formatDateTime(i.occurrence_at)||''}</span>
   `;
 
-  // Descripción / Fotos / Links
+  // Descripción
   document.getElementById('desc').textContent = i.description || '';
-  const photos = (data.photos||[]).map(p=>`<img src="${p.path_or_url}" class="img-fluid rounded me-2 mb-2" style="max-height:160px">`).join('');
+
+  // --- Fotos con lightbox (GLightbox) ---
+  const photos = (data.photos||[]).map(p => `
+    <a href="${p.path_or_url}" class="glightbox" data-gallery="inc-${i.id}">
+      <img src="${p.path_or_url}" class="img-fluid rounded me-2 mb-2" style="max-height:160px">
+    </a>
+  `).join('');
   document.getElementById('photos').innerHTML = photos ? `<h6>Fotos</h6>${photos}` : '';
-  const links  = (data.links||[]).map(l=>`<a href="${l.url}" target="_blank">${l.platform||l.url}</a>`).join(' · ');
+  if (photos) {
+    if (window._glb) window._glb.destroy();
+    window._glb = GLightbox({ selector: '.glightbox' });
+  }
+
+  // Enlaces
+  const links = (data.links||[]).map(l=>`<a href="${l.url}" target="_blank">${l.platform||l.url}</a>`).join(' · ');
   document.getElementById('links').innerHTML = links ? `<h6>Enlaces</h6><div class="small">${links}</div>` : '';
 
-  // Datos
+  // Datos (facts)
   const types = (data.types||[]).map(t=>`<span class="badge text-bg-light border me-1">${t.name}</span>`).join('');
   document.getElementById('facts').innerHTML = `
     <div><strong>Tipos:</strong> ${types||'—'}</div>
@@ -120,7 +143,7 @@ async function loadDetail(){
     </div>`).join('') || '<em class="text-muted">Sin comentarios</em>';
   document.getElementById('comments').innerHTML = comments;
 
-  // Mapa
+  // Mapa (detalle)
   const map = L.map('map').setView([i.latitude||18.7357, i.longitude||-70.1627], i.latitude?14:7);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution: '&copy; OpenStreetMap' }).addTo(map);
   if (i.latitude && i.longitude) {
@@ -128,24 +151,110 @@ async function loadDetail(){
     L.marker([i.latitude, i.longitude], {icon: iconForType(tPrim)}).addTo(map);
   }
 
-  // Formularios
-  document.getElementById('commentForm').addEventListener('submit', async (e)=>{
-    e.preventDefault(); const fd = new FormData(e.target);
-    await apiPost('/alertard/api/comment_add.php', fd);
-    e.target.reset();
-    await loadDetail();
-  });
-  document.getElementById('corrForm').addEventListener('submit', async (e)=>{
-    e.preventDefault(); const fd = new FormData(e.target);
-    await apiPost('/alertard/api/correction_add.php', fd);
-    e.target.reset();
-    alert('Corrección enviada para revisión.');
-  });
+  // Formularios: comentar
+  const cForm = document.getElementById('commentForm');
+  if (cForm) {
+    cForm.onsubmit = async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(cForm);
+      await apiPost('/alertard/api/comment_add.php', fd);
+      cForm.reset();
+      await loadDetail();
+    };
+  }
 
+  // Formularios: corrección
+  const corrForm = document.getElementById('corrForm');
+  if (corrForm) {
+    corrForm.onsubmit = async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(corrForm);
+      await apiPost('/alertard/api/correction_add.php', fd);
+      corrForm.reset();
+      alert('Corrección enviada para revisión.');
+    };
+  }
+
+  // --- Editar ubicación (solo validator/admin) ---
+  window.currentIncident = i;
+  const CAN_EDIT = <?php echo in_array(($role ?? 'guest'), ['validator','admin']) ? 'true' : 'false'; ?>;
+
+  if (CAN_EDIT) {
+    const btn = document.getElementById('btnEditLoc');
+    if (btn) btn.onclick = openEditLoc;
+  }
+
+  let editMap, editMarker;
+  function openEditLoc(){
+    const modalEl = document.getElementById('editLocModal');
+    // valores iniciales
+    document.getElementById('editLat').value = (currentIncident.latitude ?? 18.7357).toFixed(6);
+    document.getElementById('editLng').value = (currentIncident.longitude ?? -70.1627).toFixed(6);
+
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+
+    // al mostrar, montar/actualizar mapa del modal
+    modalEl.addEventListener('shown.bs.modal', ()=>{
+      const lat = parseFloat(document.getElementById('editLat').value);
+      const lng = parseFloat(document.getElementById('editLng').value);
+
+      if (!editMap) {
+        editMap = L.map('editMap').setView([lat,lng], currentIncident.latitude?14:7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution: '&copy; OpenStreetMap' }).addTo(editMap);
+        editMarker = L.marker([lat,lng], {draggable:true}).addTo(editMap);
+        editMarker.on('dragend', (e)=>{
+          const ll = e.target.getLatLng();
+          document.getElementById('editLat').value = ll.lat.toFixed(6);
+          document.getElementById('editLng').value = ll.lng.toFixed(6);
+        });
+      } else {
+        editMap.setView([lat,lng], editMap.getZoom());
+        editMarker.setLatLng([lat,lng]);
+        setTimeout(()=> editMap.invalidateSize(), 150);
+      }
+    }, {once:true});
+
+    // guardar coords
+    const form = document.getElementById('saveLocForm');
+    form.onsubmit = async (e)=>{
+      e.preventDefault();
+      const lat = parseFloat(document.getElementById('editLat').value);
+      const lng = parseFloat(document.getElementById('editLng').value);
+      await apiPost('/alertard/api/super_incident_set_coords.php', { id: currentIncident.id, latitude: lat, longitude: lng });
+      modal.hide();
+      await loadDetail(); // refresca datos/marker
+    };
+  }
+
+  // mostrar contenido
   document.getElementById('content').classList.remove('d-none');
 }
 
+
 loadDetail();
 </script>
+<!-- Modal: Editar ubicación -->
+<div class="modal fade" id="editLocModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <form class="modal-content" id="saveLocForm">
+      <div class="modal-header">
+        <h5 class="modal-title">Editar ubicación</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="editMap" class="rounded border mb-2" style="height:400px"></div>
+        <div class="row g-2">
+          <div class="col"><input class="form-control" id="editLat" name="latitude" placeholder="Latitud" required></div>
+          <div class="col"><input class="form-control" id="editLng" name="longitude" placeholder="Longitud" required></div>
+        </div>
+        <div class="form-text">Arrastra el marcador o edita las coordenadas (válidas dentro de RD).</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
 <?php require __DIR__.'/partials/footer.php'; ?>
-

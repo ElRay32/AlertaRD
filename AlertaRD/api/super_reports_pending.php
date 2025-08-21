@@ -12,12 +12,20 @@ $offset    = ($page - 1) * $limit;
 
 $where = ["i.status='pending'"];
 $params = [];
+$useFTS = (mb_strlen($q) >= 4);
+
 if ($q !== '') {
-  $where[] = "(i.title LIKE ? OR i.description LIKE ?)";
-  $params[] = "%$q%"; $params[] = "%$q%";
+  if ($useFTS) {
+    $where[] = "MATCH(i.title,i.description) AGAINST (? IN BOOLEAN MODE)";
+    $params[] = $q . '*';
+  } else {
+    $where[] = "(i.title LIKE ? OR i.description LIKE ?)";
+    $params[] = "%$q%"; $params[] = "%$q%";
+  }
 }
 if ($date_from) { $where[] = "i.occurrence_at >= ?"; $params[] = $date_from.' 00:00:00'; }
 if ($date_to)   { $where[] = "i.occurrence_at <= ?"; $params[] = $date_to.' 23:59:59'; }
+
 
 $where_sql = 'WHERE '.implode(' AND ', $where);
 

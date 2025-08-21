@@ -30,28 +30,39 @@
 <script>
 let currentPage = 1, currentLimit = 15;
 
+function escapeRegExp(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function hi(txt, term){
+  if (!term) return txt;
+  const re = new RegExp('(' + escapeRegExp(term) + ')', 'ig');
+  return (txt||'').replace(re, '<mark>$1</mark>');
+}
+
 function cardHtml(r){
+  const searchTerm = (new URLSearchParams(new FormData(document.getElementById('filters'))).get('q') || '').trim();
   const loc = [r.province, r.municipality].filter(Boolean).join(', ');
   const types = (r.types||'').split(', ').filter(Boolean).map(t=>(
     `<span class="badge text-bg-light border me-1">${t}</span>`
   )).join('');
-  const desc = (r.description||'').slice(0, 180) + ((r.description||'').length>180?'…':'');
+  const rawDesc = (r.description||'');
+  const desc = rawDesc.length>180 ? rawDesc.slice(0,180)+'…' : rawDesc;
   const photo = r.photos_count>0 ? `<span class="ms-2 small text-muted">📷 ${r.photos_count}</span>` : '';
   const when = formatDateTime(r.occurrence_at)||'';
+
   return `
   <a href="/alertard/incident.php?id=${r.id}" class="list-group-item list-group-item-action">
     <div class="d-flex w-100 justify-content-between">
-      <h6 class="mb-1">${r.title||'(sin título)'}</h6>
+      <h6 class="mb-1">${hi(r.title||'(sin título)', searchTerm)}</h6>
       <small class="text-nowrap">${when}</small>
     </div>
     <div class="mb-1 text-muted small">${loc||'—'}</div>
-    <p class="mb-1">${desc||''}</p>
+    <p class="mb-1">${hi(desc||'', searchTerm)}</p>
     <div class="d-flex justify-content-between align-items-center">
       <div>${types||''}</div>
       <div class="small text-muted">${r.latitude && r.longitude ? '🗺️ Con ubicación' : '—'}${photo}</div>
     </div>
   </a>`;
 }
+
 
 async function loadCatalogs() {
   const p = await apiGet('/alertard/api/catalogs.php?resource=provinces');

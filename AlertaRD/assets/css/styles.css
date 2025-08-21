@@ -31,3 +31,48 @@
 .map-legend .item { display:flex; align-items:center; margin-bottom:.25rem; }
 .map-legend .legend-icon { width:20px; height:20px; display:inline-block; margin-right:.5rem; }
 #heatTuning input[type="range"] { vertical-align: middle; }
+
+/* Dropzone */
+.dropzone {
+  border: 2px dashed #ced4da;
+  border-radius: .5rem;
+  padding: 1rem;
+  text-align: center;
+  transition: background-color .2s, border-color .2s;
+  cursor: pointer;
+}
+.dropzone.dragover {
+  background-color: #f8f9fa;
+  border-color: #0d6efd;
+}
+#photoPreview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: .5rem;
+}
+.preview-item {
+  position: relative;
+  border: 1px solid #e9ecef;
+  border-radius: .5rem;
+  overflow: hidden;
+  background: #fff;
+}
+.preview-item img {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  display: block;
+}
+.preview-remove {
+  position: absolute;
+  top: .25rem;
+  right: .25rem;
+  border: 0;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  border-radius: 50%;
+  font-size: 14px;
+}
