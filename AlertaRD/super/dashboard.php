@@ -1,6 +1,7 @@
 <?php require __DIR__.'/../partials/header.php'; ?>
 <h4 class="mb-3">/super - Pendientes</h4>
 <div class="mb-3">
+  <a class="btn btn-primary" href="/alertard/super/reports.php">Validar reportes</a>
   <a class="btn btn-outline-primary" href="/alertard/super/catalogs.php">Administrar Catálogos</a>
   <a class="btn btn-outline-secondary" href="/alertard/super/stats.php">Ver estadísticas</a>
   <a class="btn btn-outline-dark" href="/alertard/super/import.php">Importar CSV</a>

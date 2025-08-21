@@ -2,16 +2,17 @@
 require __DIR__.'/db.php';
 require __DIR__.'/helpers.php';
 
-$q = trim($_GET['q'] ?? '');
-$province_id = (int)($_GET['province_id'] ?? 0);
-$type_id = (int)($_GET['type_id'] ?? 0);
-$date_from = $_GET['date_from'] ?? null;
-$date_to   = $_GET['date_to'] ?? null;
-$page = max(1, (int)($_GET['page'] ?? 1));
-$limit = max(1, min(50, (int)($_GET['limit'] ?? 10)));
-$offset = ($page-1)*$limit;
+// Filtros
+$q            = trim($_GET['q'] ?? '');
+$province_id  = (int)($_GET['province_id'] ?? 0);
+$type_id      = (int)($_GET['type_id'] ?? 0);
+$date_from    = $_GET['date_from'] ?? null; // YYYY-MM-DD
+$date_to      = $_GET['date_to'] ?? null;   // YYYY-MM-DD
+$page         = max(1, (int)($_GET['page'] ?? 1));
+$limit        = min(100, max(1, (int)($_GET['limit'] ?? 20)));
+$offset       = ($page - 1) * $limit;
 
-$where = [];
+$where = ["i.status='published'"];
 $params = [];
 
 if ($q !== '') {
@@ -26,36 +27,38 @@ if ($type_id) {
   $where[] = "EXISTS(SELECT 1 FROM incident_incident_type iit WHERE iit.incident_id=i.id AND iit.type_id=?)";
   $params[] = $type_id;
 }
-if ($date_from) {
-  $where[] = "i.occurrence_at >= ?";
-  $params[] = $date_from . " 00:00:00";
-}
-if ($date_to) {
-  $where[] = "i.occurrence_at <= ?";
-  $params[] = $date_to . " 23:59:59";
-}
+if ($date_from) { $where[] = "i.occurrence_at >= ?"; $params[] = $date_from.' 00:00:00'; }
+if ($date_to)   { $where[] = "i.occurrence_at <= ?"; $params[] = $date_to.' 23:59:59'; }
 
-$where_sql = $where ? ("WHERE " . implode(" AND ", $where)) : "";
+$where_sql = 'WHERE '.implode(' AND ', $where);
 
 $sql = "
-SELECT i.id, i.title, LEFT(i.description,200) AS excerpt, i.occurrence_at, i.status,
-       p.name AS province, m.name AS municipality,
-       GROUP_CONCAT(it.name ORDER BY it.name SEPARATOR ', ') AS types
+SELECT i.id, i.title, i.description, i.occurrence_at,
+       p.name AS province, m.name AS municipality, b.name AS barrio,
+       i.latitude, i.longitude,
+       GROUP_CONCAT(DISTINCT it.name ORDER BY it.name SEPARATOR ', ') AS types,
+       (SELECT COUNT(*) FROM incident_photos ph WHERE ph.incident_id=i.id) AS photos_count
 FROM incidents i
 LEFT JOIN provinces p ON p.id=i.province_id
 LEFT JOIN municipalities m ON m.id=i.municipality_id
+LEFT JOIN barrios b ON b.id=i.barrio_id
 LEFT JOIN incident_incident_type iit ON iit.incident_id=i.id
 LEFT JOIN incident_types it ON it.id=iit.type_id
-$where_sql
+{$where_sql}
 GROUP BY i.id
 ORDER BY i.occurrence_at DESC
-LIMIT $offset, $limit
+LIMIT {$limit} OFFSET {$offset}
 ";
+$count_sql = "SELECT COUNT(*) FROM incidents i {$where_sql}";
+
 try {
-  $stmt = $pdo->prepare($sql);
-  $stmt->execute($params);
+  $stmt = $pdo->prepare($sql);   $stmt->execute($params);
   $rows = $stmt->fetchAll();
-  json_out(['data'=>$rows, 'page'=>$page, 'limit'=>$limit]);
+
+  $c = $pdo->prepare($count_sql); $c->execute($params);
+  $total = (int)$c->fetchColumn();
+
+  json_out(['data'=>$rows, 'page'=>$page, 'limit'=>$limit, 'total'=>$total]);
 } catch (Throwable $e) {
-  json_out(['error'=>$e->getMessage(), 'sql'=>$sql], 500);
+  json_out(['error'=>$e->getMessage()], 500);
 }
