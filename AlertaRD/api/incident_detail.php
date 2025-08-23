@@ -2,45 +2,48 @@
 require __DIR__.'/db.php';
 require __DIR__.'/helpers.php';
 
+header('Content-Type: application/json; charset=utf-8');
+
 $id = (int)($_GET['id'] ?? 0);
-if (!$id) json_out(['error'=>'missing id'], 400);
+if (!$id) { json_out(['error'=>'missing id'], 400); }
+
+if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+$role = $_SESSION['role'] ?? 'guest';
+
+// guest solo ve publicados
+$statusFilter = ($role === 'validator' || $role === 'admin') ? '' : " AND i.status='published'";
 
 try {
-  $stmt = $pdo->prepare("
-    SELECT i.*, p.name AS province, m.name AS municipality, b.name AS barrio
-    FROM incidents i
-    LEFT JOIN provinces p ON p.id=i.province_id
-    LEFT JOIN municipalities m ON m.id=i.municipality_id
-    LEFT JOIN barrios b ON b.id=i.barrio_id
-    WHERE i.id=?
-  ");
-  $stmt->execute([$id]);
-  $inc = $stmt->fetch();
-  if (!$inc) json_out(['error'=>'not found'], 404);
+  // usa i.* para no fallar por columnas opcionales
+  $sql = "SELECT i.*, p.name AS province_name, m.name AS municipality_name
+          FROM incidents i
+          LEFT JOIN provinces p      ON p.id = i.province_id
+          LEFT JOIN municipalities m ON m.id = i.municipality_id
+          WHERE i.id = ? {$statusFilter}";
+  $st = $pdo->prepare($sql);
+  $st->execute([$id]);
+  $incident = $st->fetch();
 
-  $stmt = $pdo->prepare("
-    SELECT it.id, it.name FROM incident_incident_type iit
-    JOIN incident_types it ON it.id=iit.type_id
-    WHERE iit.incident_id=? ORDER BY it.name
-  ");
-  $stmt->execute([$id]);
-  $types = $stmt->fetchAll();
+  if (!$incident) { json_out(['incident'=>null, 'types'=>[], 'photos'=>[]]); }
 
-  $stmt = $pdo->prepare("SELECT * FROM incident_photos WHERE incident_id=? ORDER BY is_cover DESC, id DESC");
-  $stmt->execute([$id]);
-  $photos = $stmt->fetchAll();
+  // Tipos
+  $st = $pdo->prepare("SELECT it.id, it.name
+                       FROM incident_incident_type iit
+                       JOIN incident_types it ON it.id = iit.type_id
+                       WHERE iit.incident_id = ?
+                       ORDER BY it.name");
+  $st->execute([$id]);
+  $types = $st->fetchAll();
 
-  $stmt = $pdo->prepare("SELECT * FROM incident_social_links WHERE incident_id=? ORDER BY id DESC");
-  $stmt->execute([$id]);
-  $links = $stmt->fetchAll();
+  // Fotos
+  $st = $pdo->prepare("SELECT id, path_or_url
+                       FROM incident_photos
+                       WHERE incident_id = ?
+                       ORDER BY id");
+  $st->execute([$id]);
+  $photos = $st->fetchAll();
 
-  $stmt = $pdo->prepare("SELECT c.id, u.name, c.content, c.created_at
-                         FROM incident_comments c JOIN users u ON u.id=c.user_id
-                         WHERE c.incident_id=? AND c.status='visible' ORDER BY c.id DESC");
-  $stmt->execute([$id]);
-  $comments = $stmt->fetchAll();
-
-  json_out(['incident'=>$inc, 'types'=>$types, 'photos'=>$photos, 'links'=>$links, 'comments'=>$comments]);
+  json_out(['incident'=>$incident, 'types'=>$types, 'photos'=>$photos]);
 } catch (Throwable $e) {
   json_out(['error'=>$e->getMessage()], 500);
 }

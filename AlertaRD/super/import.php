@@ -95,7 +95,7 @@ async function sendForm(formId) {
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const fd = new FormData(form);
-    const res = await fetch('/alertard/api/import_csv.php', {
+    const res = await fetch('<?= $BASE_URL }}/api/import_csv.php', {
       method: 'POST',
       body: fd,
       credentials: 'same-origin'

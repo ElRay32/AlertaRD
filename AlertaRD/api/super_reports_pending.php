@@ -30,21 +30,25 @@ if ($date_to)   { $where[] = "i.occurrence_at <= ?"; $params[] = $date_to.' 23:5
 $where_sql = 'WHERE '.implode(' AND ', $where);
 
 $sql = "
-SELECT i.id, i.title, i.occurrence_at, i.created_at,
-       p.name AS province, m.name AS municipality,
-       r.name AS reporter_name,
-       GROUP_CONCAT(DISTINCT it.name ORDER BY it.name SEPARATOR ', ') AS types
+SELECT
+  i.id, i.title, i.occurrence_at, i.created_at,
+  p.name AS province, m.name AS municipality,
+  t.types
 FROM incidents i
-LEFT JOIN provinces p ON p.id=i.province_id
-LEFT JOIN municipalities m ON m.id=i.municipality_id
-LEFT JOIN users r ON r.id=i.reporter_user_id
-LEFT JOIN incident_incident_type iit ON iit.incident_id=i.id
-LEFT JOIN incident_types it ON it.id=iit.type_id
+LEFT JOIN provinces      p ON p.id = i.province_id
+LEFT JOIN municipalities m ON m.id = i.municipality_id
+LEFT JOIN (
+  SELECT iit.incident_id,
+         GROUP_CONCAT(DISTINCT it.name ORDER BY it.name SEPARATOR ', ') AS types
+  FROM incident_incident_type iit
+  JOIN incident_types it ON it.id = iit.type_id
+  GROUP BY iit.incident_id
+) t ON t.incident_id = i.id
 {$where_sql}
-GROUP BY i.id
-ORDER BY i.created_at DESC
+ORDER BY i.occurrence_at DESC
 LIMIT {$limit} OFFSET {$offset}
 ";
+
 $count_sql = "SELECT COUNT(*) FROM incidents i {$where_sql}";
 
 try {

@@ -1,13 +1,10 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
+require_once __DIR__.'/../api/db.php';
 
 function ecfg() {
   static $cfg=null; if ($cfg===null) $cfg = require __DIR__.'/email_config.php';
   return $cfg;
-}
-function dbx() {
-  require __DIR__.'/../api/db.php'; // deja $pdo
-  return $pdo;
 }
 function now_mysql(){ return date('Y-m-d H:i:s'); }
 function plus_minutes($m){ return date('Y-m-d H:i:s', time()+($m*60)); }
@@ -118,7 +115,7 @@ function notify_incident_status($incident_id, $new_status, $note=null){
     $subject = "Tu reporte fue PUBLICADO: ".$title;
     $html = "<p>Hola {$i['reporter_name']},</p>
       <p>Tu reporte <strong>{$title}</strong> ha sido <strong>publicado</strong>.</p>
-      <p>Puedes verlo aquí: <a href=\"".url_origin()."/alertard/incident.php?id={$i['id']}\">ver detalle</a></p>
+      <p>Puedes verlo aquí: <a href=\"".url_origin()."<?= $BASE_URL ?>/incident.php?id={$i['id']}\">ver detalle</a></p>
       <p>Gracias por contribuir.</p>";
   } elseif ($new_status === 'rejected') {
     $subject = "Tu reporte fue RECHAZADO: ".$title;

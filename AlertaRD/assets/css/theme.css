@@ -118,3 +118,37 @@ h1,h2,h3,h4,h5,h6 { color: var(--text); }
   position: absolute; top: .25rem; right: .25rem; border: 0; background: rgba(0,0,0,.55); color: #fff;
   width: 24px; height: 24px; line-height: 24px; border-radius: 50%; font-size: 14px;
 }
+
+
+/* Sidebar collapsible */
+body.sidebar-collapsed .sidebar { display: none !important; }
+body.sidebar-collapsed .app-content { flex: 0 0 100% !important; max-width: 100% !important; }
+
+/* Ensure content starts at top */
+.app-content { display: block !important; justify-content: flex-start !important; align-content: flex-start !important; }
+
+
+/* ==== UI Light Patch: force light mode & layout fixes ==== */
+:root {
+  --bg: #ffffff;
+  --text: #111827;
+  --muted: #6b7280;
+  --panel: #ffffff;
+  --panel-2: #f8fafc;
+  --stroke: #e5e7eb;
+  --primary: #2563eb;
+  --primary-contrast: #ffffff;
+}
+html, body { background: var(--bg) !important; color: var(--text) !important; }
+.app-header, .sidebar, .card, .filter-bar, .table, .form-control, .form-select {
+  background: var(--panel) !important; color: var(--text) !important;
+}
+.form-control, .form-select { border-color: var(--stroke) !important; }
+.app-content { padding: 1rem !important; }
+.filter-bar {
+  position: sticky; top: 0; z-index: 20; background: var(--panel);
+  border-bottom: 1px solid var(--stroke); padding: .75rem 1rem;
+  margin: 0 0 1rem 0; border-radius: .5rem;
+}
+body.sidebar-collapsed .sidebar { display: none !important; }
+body.sidebar-collapsed .app-content { max-width: 100% !important; flex: 0 0 100% !important; }

@@ -1,0 +1,104 @@
+/* === Hard Light Fix (no gradients, no overlap) === */
+
+/* 1) Backgrounds: plain white, kill gradients */
+html, body, .app-content, .app-header, .sidebar, .card, .table, .table thead {
+  background: #ffffff !important;
+  background-image: none !important;
+  color: #111827 !important;
+}
+.app-content::before, .app-content::after { display: none !important; }
+
+/* 2) Borders / strokes for light mode */
+.app-header, .sidebar, .filter-bar, .table, .table thead th {
+  border-color: #e5e7eb !important;
+}
+
+/* 3) Inputs legibles */
+.form-control, .form-select {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+/* 4) Layout: que la barra de filtros no se esconda bajo el menú */
+.app-content { position: static; z-index: auto; padding: 1rem !important; }
+
+.sidebar { position: sticky; top: 64px; z-index: 2; }
+.filter-bar {
+  position: sticky;
+  top: 0;
+  z-index: 3;            /* por encima del sidebar */
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: .5rem;
+  padding: .75rem 1rem;
+  margin: 0 0 1rem 0;    /* sin márgenes negativos */
+}
+
+/* 5) Sidebar colapsable */
+body.sidebar-collapsed .sidebar { display: none !important; }
+body.sidebar-collapsed .app-content { max-width: 100% !important; flex: 0 0 100% !important; }
+
+/* 6) Tablas y encabezados claros */
+.table thead th { background: #f8fafc !important; color: #334155 !important; }
+
+
+/* === Fixed Sidebar Layout (no push down) === */
+:root{
+  --header-h: 64px;     /* ajusta si tu header es más alto/bajo */
+  --sidebar-w: 260px;   /* ancho del menú en desktop */
+}
+
+/* Header pegado arriba para que sidebar pueda referenciar su altura */
+.app-header{
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #fff;
+}
+
+/* Sidebar fijo a la izquierda: no empuja el contenido, solo se superpone si margin-left=0 */
+.sidebar{
+  position: fixed;
+  top: var(--header-h);
+  left: 0;
+  width: var(--sidebar-w);
+  height: calc(100vh - var(--header-h));
+  overflow:auto;
+  border-right: 1px solid #e5e7eb;
+  background:#fff;
+  z-index: 90;
+  transform: translateX(0);
+  transition: transform .2s ease;
+}
+
+/* Contenido ocupa el resto, sin bajar ni moverse verticalmente */
+.app-content{
+  margin-left: var(--sidebar-w);
+  transition: margin-left .2s ease;
+  padding: 1rem;
+}
+
+/* Estado colapsado: ocultamos sidebar desplazándolo y el contenido ocupa 100% */
+body.sidebar-collapsed .sidebar{ transform: translateX(-100%); }
+body.sidebar-collapsed .app-content{ margin-left: 0; }
+
+/* Móviles: el sidebar es overlay; el contenido siempre a 100% */
+@media (max-width: 991.98px){
+  :root{ --sidebar-w: 86vw; }      /* overlay más estrecho en móviles */
+  .app-content{ margin-left: 0; }  /* contenido nunca deja espacio lateral */
+}
+
+/* Barra de filtros pegada y por encima del contenido (no debajo del menú) */
+.filter-bar{
+  position: sticky;
+  top: 0;
+  z-index: 95; /* por encima del contenido pero debajo del header */
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: .5rem;
+  padding: .75rem 1rem;
+  margin: 0 0 1rem 0;
+}
+/* tables */
+.table thead th{ background:#f8fafc; color:#334155; }

@@ -96,6 +96,9 @@
 </div>
 
 <script>
+const BASE = window.BASE_URL || '';
+const join = (p) => (BASE + p).replace(/([^:]\/)\/+/g, '$1'); // une BASE + path sin // dobles
+
 let currentPage = 1, currentLimit = 20;
 
 function rowHtml(r){
@@ -118,14 +121,22 @@ function rowHtml(r){
 }
 
 async function load(page=1){
-  currentPage = page;
-  const qs = new URLSearchParams(new FormData(document.getElementById('filters')));
-  qs.set('page', page); qs.set('limit', currentLimit);
-  const res = await apiGet('/alertard/api/super_reports_pending.php?' + qs.toString());
-  const tb = document.querySelector('#tbl tbody');
-  tb.innerHTML = res.data.map(rowHtml).join('') || `<tr><td colspan="8" class="text-muted">No hay pendientes.</td></tr>`;
-  renderPager(res.total, res.page, res.limit);
-}
+   try{
+     currentPage = page;
+     const qs = new URLSearchParams(new FormData(document.getElementById('filters')));
+     qs.set('page', page); qs.set('limit', currentLimit);
+     const url = '/api/super_reports_pending.php?' + qs.toString();
+     const res  = await apiGet('/api/super_reports_pending.php?' + qs.toString());
+     console.log('[PENDIENTES]', res); // debug
+     const tb = document.querySelector('#tbl tbody');
+     tb.innerHTML = (res.data || []).map(rowHtml).join('') || `<tr><td colspan="8" class="text-muted">No hay pendientes.</td></tr>`;
+     renderPager(res.total || 0, res.page || 1, res.limit || currentLimit);
+   }catch(err){
+     console.error('Error cargando pendientes:', err);
+     const tb = document.querySelector('#tbl tbody');
+     if (tb) tb.innerHTML = `<tr><td colspan="8" class="text-danger">Error: ${String(err.message || err)}</td></tr>`;
+   }
+ }
 
 function renderPager(total, page, limit){
   const ul = document.getElementById('pager'); ul.innerHTML='';
@@ -140,7 +151,7 @@ function renderPager(total, page, limit){
 }
 
 async function ver(id){
-  const data = await apiGet('/alertard/api/incident_detail.php?id=' + id);
+  const data = await apiGet('/api/incident_detail.php?id=' + id);
   document.getElementById('modalTitle').textContent = `#${data.incident.id} · ${data.incident.title}`;
   const photos = (data.photos||[]).map(p=>`<img src="${p.path_or_url}" class="img-fluid rounded me-2 mb-2" style="max-height:120px">`).join('');
   const types  = (data.types||[]).map(t=>`<span class="badge text-bg-light border me-1">${t.name}</span>`).join('');
@@ -170,7 +181,7 @@ async function ver(id){
 
 async function pub(id){
   if (!confirm('¿Publicar este reporte?')) return;
-  await apiPost('/alertard/api/super_incident_publish.php', {id});
+  await apiPost('/api/super_incident_publish.php', { id });
   await load(currentPage);
 }
 
@@ -182,7 +193,7 @@ function openReject(id){
 document.getElementById('rejectForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const fd = new FormData(e.target);
-  await apiPost('/alertard/api/super_incident_reject.php', fd);
+  await apiPost('/api/super_incident_reject.php', fd);
   bootstrap.Modal.getInstance(document.getElementById('rejectModal')).hide();
   await load(currentPage);
 });
@@ -208,7 +219,7 @@ document.getElementById('mergeForm').addEventListener('submit', async (e)=>{
   const primary_id = parseInt(document.querySelector('input[name=primary_id]:checked').value, 10);
   const all = document.querySelector('#mergeBody input[name=children]').value.split(',').map(x=>parseInt(x,10));
   const children = all.filter(x=>x!==primary_id);
-  await apiPost('/alertard/api/super_incident_merge.php', {primary_id, children});
+  await apiPost('/api/super_incident_merge.php', {primary_id, children});
   bootstrap.Modal.getInstance(document.getElementById('mergeModal')).hide();
   // desmarcar todo
   document.getElementById('chkAll').checked = false;
@@ -227,7 +238,7 @@ document.getElementById('chkAll').addEventListener('change', (e)=>{
 });
 
 // Init
-load(1);
+document.addEventListener('DOMContentLoaded', () => { load(1); });
 </script>
 
 <?php require __DIR__.'/../partials/footer.php'; ?>

@@ -1,37 +1,33 @@
 <?php
-// /alertard/api/db.php
-// Conexión PDO reutilizable con función dbx()
+// /AlertaRD/api/db.php (fixed)
+declare(strict_types=1);
 
-function dbx(){
+require_once __DIR__.'/helpers.php';
+
+function dbx(): PDO {
   static $pdo = null;
-  if ($pdo) return $pdo;
+  if ($pdo instanceof PDO) return $pdo;
 
-  // Ajusta aquí si tu puerto/usuario/clave son distintos
-  $host = '127.0.0.1';     // en XAMPP es mejor 127.0.0.1 que "localhost"
-  $db   = 'alertard';      // nombre de tu base importada
-  $user = 'root';          // usuario por defecto de XAMPP
-  $pass = '';              // contraseña por defecto vacía
+  $host    = '127.0.0.1';
+  $db      = 'alertard';
+  $user    = 'root';
+  $pass    = '';
   $charset = 'utf8mb4';
 
-  // Si usas puerto distinto a 3306, agrega ;port=3307 (por ejemplo)
   $dsn = "mysql:host={$host};dbname={$db};charset={$charset}";
-
   $opts = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     PDO::ATTR_EMULATE_PREPARES   => false,
   ];
-
   try {
     $pdo = new PDO($dsn, $user, $pass, $opts);
+    $pdo->exec("SET NAMES utf8mb4");
     return $pdo;
   } catch (Throwable $e) {
-    http_response_code(500);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-      'error'  => 'DB connection failed',
-      'detail' => $e->getMessage()
-    ]);
-    exit;
+    json_out(['ok'=>false,'error'=>'DB connection failed','detail'=>$e->getMessage()], 500);
   }
 }
+
+// Proveer $pdo global para los scripts antiguos
+$pdo = dbx();

@@ -1,106 +1,73 @@
 <?php
-require __DIR__.'/../api/db.php';
-require __DIR__.'/email_lib.php';
-require __DIR__.'/../api/helpers.php';
+// auth/email_verify.php  (FIX: expiración validada por la BD)
+require_once __DIR__ . '/../api/helpers.php';
+require_once __DIR__ . '/../api/db.php';
+start_session_safe();
 require_csrf();
 
-// === BLOQUE DE VERIFICACIÓN OTP (REEMPLAZA TU LÓGICA ACTUAL) ===
-$email = trim($_POST['email'] ?? (body_json()['email'] ?? ''));
-$code  = trim($_POST['code']  ?? (body_json()['code']  ?? ''));
+$pdo = dbx();
 
-if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $code==='') {
-  echo json_encode(['ok'=>false,'error'=>'bad_request']); exit;
+$email = strtolower(trim($_POST['email'] ?? ''));
+$code  = trim($_POST['code'] ?? '');
+
+if ($email === '' || $code === '' || !preg_match('/^\d{6}$/', $code)) {
+  json_out(['ok' => false, 'error' => 'Datos inválidos'], 422);
 }
 
-// Trae el token más reciente NO usado y NO vencido
-$sql = "SELECT * FROM login_tokens
-        WHERE email=? AND used=0 AND expires_at > NOW()
-        ORDER BY created_at DESC LIMIT 1";
-$st = dbx()->prepare($sql);
-$st->execute([$email]);
-$tok = $st->fetch();
+// Buscar token NO usado y NO expirado directamente en la BD
+$stmt = $pdo->prepare("
+  SELECT id, code
+  FROM login_tokens
+  WHERE email = ? AND used = 0 AND expires_at >= NOW()
+  ORDER BY id DESC
+  LIMIT 1
+");
+$stmt->execute([$email]);
+$tok = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$tok) {
-  echo json_encode(['ok'=>false,'error'=>'invalid_or_expired']); exit;
+  json_out(['ok' => false, 'error' => 'Código expirado'], 410);
 }
 
-// Demasiados intentos con este token
-if (otp_blocked($tok)) {
-  echo json_encode(['ok'=>false,'error'=>'too_many_attempts']); exit;
+// Comparar código
+if ($code !== $tok['code']) {
+  // Opcional: incrementar intentos si la columna existe
+  try {
+    $pdo->prepare("UPDATE login_tokens SET verify_attempts = verify_attempts + 1, last_attempt_at = NOW() WHERE id = ?")->execute([$tok['id']]);
+  } catch (Throwable $e) { /* columna opcional */ }
+  json_out(['ok' => false, 'error' => 'Código incorrecto'], 401);
 }
 
-// Compara el código (texto plano; si lo guardas hasheado, adapta esta línea)
-if (!hash_equals($tok['code'], $code)) {
-  otp_register_attempt($tok['id']); // suma intento y marca hora
-  echo json_encode(['ok'=>false,'error'=>'wrong_code','attempts'=>((int)$tok['verify_attempts']+1)]); exit;
+// Éxito: marcar usado
+$pdo->prepare("UPDATE login_tokens SET used = 1, used_at = NOW() WHERE id = ?")->execute([$tok['id']]);
+
+// Crear usuario si no existe
+$stmt = $pdo->prepare("SELECT id, name, email, role_id, is_active FROM users WHERE email = ? LIMIT 1");
+$stmt->execute([$email]);
+$u = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$u) {
+  $name = ucfirst(strtok($email, '@'));
+  $pdo->prepare("
+    INSERT INTO users (name, email, role_id, provider, is_active)
+    VALUES (?, ?, 1, 'google', 1)
+  ")->execute([$name, $email]);
+  $userId = (int)$pdo->lastInsertId();
+  $roleName = 'reporter';
+} else {
+  $userId = (int)$u['id'];
+  $roleId  = (int)$u['role_id'];
+  $roleName = ($roleId === 3 ? 'admin' : ($roleId === 2 ? 'validator' : 'reporter'));
+  if (!$u['is_active']) {
+    $pdo->prepare("UPDATE users SET is_active = 1 WHERE id = ?")->execute([$userId]);
+  }
 }
 
-// Éxito: marca token usado
-dbx()->prepare("UPDATE login_tokens SET used=1, last_attempt_at=NOW() WHERE id=?")->execute([$tok['id']]);
+// Iniciar sesión
+$_SESSION['user_id'] = $userId;
+$_SESSION['email']   = $email;
+$_SESSION['name']    = $u['name'] ?? ($name ?? strtok($email, '@'));
+$_SESSION['role']    = $roleName;
 
-
-// crea/actualiza usuario reporter
-      $user_id = upsert_reporter_email($email);
-
-      // inicia sesión
-      $_SESSION['user_id'] = $user_id;
-      $_SESSION['name']    = strstr($email,'@',true);
-      $_SESSION['role']    = 'reporter';
-
-      // limpia
-      unset($_SESSION['otp_email'], $_SESSION['otp_last_code']);
-
-      header('Location: /alertard/index.php');
-      exit;
-
-echo json_encode(['ok'=>true]);
-
-
-      
-    
-?>
-<?php require __DIR__.'/../partials/header.php'; ?>
-<div class="row justify-content-center">
-  <div class="col-md-6">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title mb-3">Verifica tu correo</h5>
-        <p>Hemos enviado un código a <strong><?php echo htmlspecialchars($email); ?></strong>.
-           Revisa tu bandeja de entrada (y spam).</p>
-
-        <?php if ($cfg['debug_show_code'] && !empty($_SESSION['otp_last_code'])): ?>
-          <div class="alert alert-warning">
-            <strong>DEBUG:</strong> tu código es <code><?php echo htmlspecialchars($_SESSION['otp_last_code']); ?></code>
-            (no mostrar en producción).
-          </div>
-        <?php endif; ?>
-
-        <?php if ($msg): ?>
-          <div class="alert alert-danger"><?php echo htmlspecialchars($msg); ?></div>
-        <?php endif; ?>
-
-        <form action="/alertard/auth/email_verify.php" method="POST" id="form-verify">
-          <div class="col-12">
-            <input type="text" class="form-control" name="code" placeholder="Código de 6 dígitos" maxlength="6" required>
-          </div>
-          <div class="col-12 d-grid">
-              <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
-              <input type="email" name="email" class="form-control" required>
-              <input type="text"  name="code"  class="form-control" maxlength="6" required>
-            <button class="btn btn-success" type="submit">Entrar</button>
-          </div>
-        </form>
-
-        <form method="post" action="/alertard/auth/email_start.php" class="mt-2">
-          <input type="hidden" name="email" value="<?php echo htmlspecialchars($email); ?>">
-          <button class="btn btn-link p-0">Reenviar código</button>
-        </form>
-
-        <div class="mt-3">
-          <a href="/alertard/auth/login.php" class="small">Cambiar correo</a>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-<?php require __DIR__.'/../partials/footer.php'; ?>
+// Respuesta
+json_out(['ok' => true, 'role' => $_SESSION['role']]);

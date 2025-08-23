@@ -26,10 +26,9 @@ try {
   $upd->execute([$user_id, $id]);
 
   $pdo->commit();
-
-// Notificar al reportero
+  
+  // Notificar al reportero
 @notify_incident_status($id, 'published', null);
-
 
   json_out(['ok'=>true]);
 } catch (Throwable $e) {

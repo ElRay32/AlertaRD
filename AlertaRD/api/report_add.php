@@ -42,7 +42,7 @@ try {
       $tmp = $_FILES['photos']['tmp_name'][$i];
       $target = $upload_dir . '/' . time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/','_', $name);
       if (is_uploaded_file($tmp) && move_uploaded_file($tmp, $target)) {
-        $public = '/alertard/uploads/' . basename($target);
+        $public = '<?= $BASE_URL }}/uploads/' . basename($target);
         $stmt = $pdo->prepare("INSERT INTO incident_photos(incident_id,path_or_url,is_cover) VALUES (?,?,?)");
         $stmt->execute([$incident_id, $public, $i==0 ? 1 : 0]);
       }

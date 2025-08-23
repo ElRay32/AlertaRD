@@ -1,78 +1,59 @@
 <?php
 require __DIR__.'/db.php';
-require __DIR__.'/helpers.php';
-require_csrf();
+header('Content-Type: application/json; charset=utf-8');
 
-require_role(['validator','admin']);
+function ok($a=[]){ echo json_encode(['ok'=>true]+$a, JSON_UNESCAPED_UNICODE); exit; }
+function err($m,$c=400){ http_response_code($c); echo json_encode(['ok'=>false,'error'=>$m], JSON_UNESCAPED_UNICODE); exit; }
 
-$data = $_POST + body_json();
-$resource = $data['resource'] ?? '';
-$id = isset($data['id']) && $data['id'] !== '' ? (int)$data['id'] : null;
-$name = trim($data['name'] ?? '');
+$entity = trim($_POST['entity'] ?? '');
+$id     = (int)($_POST['id'] ?? 0);
+$name   = trim($_POST['name'] ?? '');
+$province_id     = (int)($_POST['province_id'] ?? 0);
+$municipality_id = (int)($_POST['municipality_id'] ?? 0);
 
-if (!in_array($resource, ['provinces','municipalities','barrios','types'])) {
-  json_out(['error'=>'invalid resource'], 400);
-}
-if ($name === '') json_out(['error'=>'name required'], 400);
+if ($name==='') err('Falta nombre');
 
 try {
-  switch ($resource) {
-    case 'provinces':
-      if ($id) {
-        $stmt = $pdo->prepare("UPDATE provinces SET name=? WHERE id=?");
-        $stmt->execute([$name, $id]);
-        json_out(['ok'=>true,'action'=>'updated','id'=>$id]);
-      } else {
-        $stmt = $pdo->prepare("INSERT INTO provinces(name) VALUES (?)");
-        $stmt->execute([$name]);
-        json_out(['ok'=>true,'action'=>'created','id'=>$pdo->lastInsertId()]);
-      }
-      break;
+  if ($entity==='municipalities') {
+    // único por (province_id, name)
+    $st = $pdo->prepare("SELECT id FROM municipalities WHERE name=? AND province_id=? AND id<>?");
+    $st->execute([$name,$province_id,$id]);
+    if ($st->fetch()) err('Ya existe un municipio con ese nombre en esa provincia', 409);
 
-    case 'municipalities':
-      $province_id = (int)($data['province_id'] ?? 0);
-      if (!$province_id) json_out(['error'=>'province_id required'], 400);
-      if ($id) {
-        $stmt = $pdo->prepare("UPDATE municipalities SET name=?, province_id=? WHERE id=?");
-        $stmt->execute([$name, $province_id, $id]);
-        json_out(['ok'=>true,'action'=>'updated','id'=>$id]);
-      } else {
-        $stmt = $pdo->prepare("INSERT INTO municipalities(province_id,name) VALUES (?,?)");
-        $stmt->execute([$province_id, $name]);
-        json_out(['ok'=>true,'action'=>'created','id'=>$pdo->lastInsertId()]);
-      }
-      break;
-
-    case 'barrios':
-      $municipality_id = (int)($data['municipality_id'] ?? 0);
-      if (!$municipality_id) json_out(['error'=>'municipality_id required'], 400);
-      if ($id) {
-        $stmt = $pdo->prepare("UPDATE barrios SET name=?, municipality_id=? WHERE id=?");
-        $stmt->execute([$name, $municipality_id, $id]);
-        json_out(['ok'=>true,'action'=>'updated','id'=>$id]);
-      } else {
-        $stmt = $pdo->prepare("INSERT INTO barrios(municipality_id,name) VALUES (?,?)");
-        $stmt->execute([$municipality_id, $name]);
-        json_out(['ok'=>true,'action'=>'created','id'=>$pdo->lastInsertId()]);
-      }
-      break;
-
-    case 'types':
-      if ($id) {
-        $stmt = $pdo->prepare("UPDATE incident_types SET name=? WHERE id=?");
-        $stmt->execute([$name, $id]);
-        json_out(['ok'=>true,'action'=>'updated','id'=>$id]);
-      } else {
-        $stmt = $pdo->prepare("INSERT INTO incident_types(name) VALUES (?)");
-        $stmt->execute([$name]);
-        json_out(['ok'=>true,'action'=>'created','id'=>$pdo->lastInsertId()]);
-      }
-      break;
+    if ($id) {
+      $pdo->prepare("UPDATE municipalities SET name=?, province_id=? WHERE id=?")->execute([$name,$province_id,$id]);
+    } else {
+      $pdo->prepare("INSERT INTO municipalities(name, province_id) VALUES(?,?)")->execute([$name,$province_id]);
+    }
+    ok();
   }
-} catch (PDOException $e) {
-  // Maneja duplicados/unique o FK
-  if ($e->getCode() == '23000') {
-    json_out(['error'=>'constraint','detail'=>$e->getMessage()], 409);
+
+  if ($entity==='barrios') {
+    // único por (municipality_id, name)
+    $table = 'barrios'; // cambia si se llama distinto
+    $st = $pdo->prepare("SELECT id FROM `$table` WHERE name=? AND municipality_id=? AND id<>?");
+    $st->execute([$name,$municipality_id,$id]);
+    if ($st->fetch()) err('Ya existe un barrio con ese nombre en ese municipio', 409);
+
+    if ($id) {
+      $pdo->prepare("UPDATE `$table` SET name=?, municipality_id=? WHERE id=?")->execute([$name,$municipality_id,$id]);
+    } else {
+      $pdo->prepare("INSERT INTO `$table`(name, municipality_id) VALUES(?,?)")->execute([$name,$municipality_id]);
+    }
+    ok();
   }
-  json_out(['error'=>$e->getMessage()], 500);
+
+  if ($entity==='provinces') {
+    $st = $pdo->prepare("SELECT id FROM provinces WHERE name=? AND id<>?");
+    $st->execute([$name,$id]);
+    if ($st->fetch()) err('Ya existe una provincia con ese nombre', 409);
+
+    if ($id) $pdo->prepare("UPDATE provinces SET name=? WHERE id=?")->execute([$name,$id]);
+    else     $pdo->prepare("INSERT INTO provinces(name) VALUES(?)")->execute([$name]);
+    ok();
+  }
+
+  err('Entidad no soportada',400);
+} catch (Throwable $e) {
+  err($e->getMessage(),500);
 }
